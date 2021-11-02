@@ -64,90 +64,122 @@ def lexical(line, i, next_token, token_string):
 
 
 def expr(line, nextToken, i, next_token, token_string):
-  # print("Enter <expr>")
 
-  nextToken, idx = term(line, nextToken, i, next_token, token_string)
-  nextToken, idx = term_tail(line, nextToken, idx, next_token, token_string)
+  nextToken, idx, n = term(line, nextToken, i, next_token, token_string)
+  nextToken, idx, n = term_tail(line, nextToken, idx, next_token, token_string, n)
 
-  # print("Exit <expr>")
-
-  return nextToken, idx
+  return nextToken, idx, n
 
 
 def term(line, nextToken, i, next_token, token_string):
-  # print("Enter <term>")
 
-  nextToken, idx = factor(line, nextToken, i, next_token, token_string)
-  nextToken, idx = factor_tail(line, nextToken, idx, next_token, token_string)
+  nextToken, idx, n = factor(line, nextToken, i, next_token, token_string)
+  nextToken, idx, n = factor_tail(line, nextToken, idx, next_token, token_string, n)
 
-  return nextToken, idx
+  return nextToken, idx, n
 
 
-def term_tail(line, nextToken, i, next_token, token_string):
+def term_tail(line, nextToken, i, next_token, token_string, n):
 
   if nextToken == 3: # <add_op>
     nextToken, idx = lexical(line, i, next_token, token_string)
-    nextToken, idx =  term(line, nextToken, idx, next_token, token_string,)
-    nextToken, idx = term_tail(line, nextToken, idx, next_token, token_string)
+
+    if nextToken == 3:
+      error.append('(Warning) "중복연산자 제거"')
+      nextToken, idx = lexical(line, idx, next_token, token_string)
+      del line[idx-2]
+      idx = idx-1 # 인덱스 하나 줄었으니까 같이 마이너스
+
+    nextToken, idx, m =  term(line, nextToken, idx, next_token, token_string)
+    nextToken, idx, m = term_tail(line, nextToken, idx, next_token, token_string, m)
+
+    if n == 'Unknown' or m == 'Unknown':
+      n = 'Unknown'
+    else:
+      if line[i-1] == '+':
+        n = int(n)+int(m)
+      else:
+        n = int(n)-int(m)
   
   else:
     idx = i
   
   # print("Exit <term>")
 
-  return nextToken, idx
+  return nextToken, idx, n
 
 
 def factor(line, nextToken, i, next_token, token_string):
   # print("Enter <factor>")
 
+  n = 'Unknown'
+
   if nextToken == 8 or nextToken == 7: # <ident> or <const>
-    if nextToken == 8 and (line[i-1] not in symbol_table):
-      error.append('(Error) "정의되지 않은 변수({})가 참조됨."'.format(line[i-1]))
-      symbol_table.append(line[i-1])
+    if nextToken == 8: # <ident>
+      if line[i-1] in symbol_table: # 존재하는데
+        if symbol_table[line[i-1]] == 'Unknown': # 정의되지 않은 ident이면
+          n = 'Unknown'
+        else: # 정의된 ident이면
+          n = symbol_table[line[i-1]]
+      else:
+        error.append('(Error) "정의되지 않은 변수({})가 참조됨."'.format(line[i-1]))
+        # print(line[i-1])
+        symbol_table[line[i-1]] = 'Unknown'
+        n = 'Unknown'
+    else: # <const>
+      n = int(line[i-1])
 
     nextToken, idx = lexical(line, i, next_token, token_string)
   
   elif nextToken == 5: #<left_paren>
     nextToken, idx = lexical(line, i, next_token, token_string)
-    nextToken, idx =  expr(line, nextToken, idx, next_token, token_string)
+    nextToken, idx, n =  expr(line, nextToken, idx, next_token, token_string)
 
     if nextToken == 6: # <right_paren>
       nextToken, idx = lexical(line, idx, next_token, token_string)
     else:
-      error.append('(Error) "왼쪽 괄호 후 오른쪽 괄호가 들어오지 않음"')
+      error.append('(Warning) "왼쪽 괄호 후 오른쪽 괄호가 들어오지 않음"')
+      line.insert(idx-1, ')') # Warning 띄우고 오른쪽 괄호 삽입한 후 파서 계속 진행
       nextToken, idx = lexical(line, idx, next_token, token_string)
   
   else:
     error.append('(Error) "식별자 또는 숫자 또는 왼쪽 괄호가 들어오지 않음"')
     nextToken, idx = lexical(line, i, next_token, token_string)
   
-  return nextToken, idx # <term>의 <factor_tail>로 전달
+  return nextToken, idx, n
 
 
-def factor_tail(line, nextToken, i, next_token, token_string):
+def factor_tail(line, nextToken, i, next_token, token_string, n):
 
   if nextToken == 4: # <mult_op>
     nextToken, idx = lexical(line, i, next_token, token_string)
-    nextToken, idx =  factor(line, nextToken, idx, next_token, token_string)
-    nextToken, idx = factor_tail(line, nextToken, idx, next_token, token_string)
+    nextToken, idx, m =  factor(line, nextToken, idx, next_token, token_string)
+    nextToken, idx, m = factor_tail(line, nextToken, idx, next_token, token_string, m)
+    
+    if n == 'Unknown' or m == 'Unknown':
+      n = 'Unknown'
+    else:
+      if line[i-1] == '*':
+        n = int(n)*int(m)
+      else:
+        n = int(n)/int(m)
   
   else:
     idx = i
 
   # print("Exit <factor>")
 
-  return nextToken, idx
+  return nextToken, idx, n
   
 
 # file_path = sys.argv[1]
 # input = open(file_path)
 
 cwd = os.getcwd()
-path = os.path.join(cwd, "프로그래밍언어론\input2.txt")
+path = os.path.join(cwd, "프로그래밍언어론\input4.txt")
 input = open(path)
 
-symbol_table = [] # 현재 ident 
+symbol_table = dict() # 현재 ident 
 
 for line in input.readlines():
 
@@ -159,21 +191,21 @@ for line in input.readlines():
   token_string = [] # 문자열 배열 초기화
 
   nextToken, idx = lexical(line, 0, next_token, token_string)
+  # print(line[idx-1])
+  idt = line[idx-1]
 
-  if nextToken == 8: # <ident>
-    nextToken, idx = lexical(line, idx, next_token, token_string)
-
-    if nextToken == 1: # ident := 형태이면 ident 저장
-      symbol_table.append(line[idx-2])
-
-  else:
+  if nextToken != 8: # <ident>
     error.append('(Error) "식별자로 시작하지 않음"')
+
+  nextToken, idx = lexical(line, idx, next_token, token_string)
 
   if nextToken != 1: # <assignment_op>
     error.append('(Error) ":= 왼쪽에 <expr>이 올 수 없음"') # warning으로 바꿀 수 있을 듯..?
     
   nextToken, idx = lexical(line, idx, next_token, token_string)
-  nextToken, idx = expr(line, nextToken, idx, next_token, token_string)
+  nextToken, idx, num = expr(line, nextToken, idx, next_token, token_string)
+  # print(num)
+  symbol_table[idt] = num
   
 
   for l in line:
@@ -190,8 +222,9 @@ for line in input.readlines():
     print("<Yes>")
   
   print()
+  # print(symbol_table)
   
-
+print()
 print(symbol_table)
 
 
