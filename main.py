@@ -144,7 +144,7 @@ def factor_tail(line, nextToken, i, next_token, token_string):
 # input = open(file_path)
 
 cwd = os.getcwd()
-path = os.path.join(cwd, "프로그래밍언어론\input1.txt")
+path = os.path.join(cwd, "프로그래밍언어론\input2.txt")
 input = open(path)
 
 symbol_table = [] # 현재 ident 
